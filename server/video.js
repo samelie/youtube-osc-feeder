@@ -1,14 +1,24 @@
 const path = require('path')
 const fs = require('fs')
 
+const Q = require('bluebird')
+const BluebirdQueue = require('./bluebirdQueue')
 const Convert = require('./convert')
 
 
-const getVo = (manifest, options) => {
+const downloadVo = (manifest, options) => {
 
   let { sidx } = manifest
   let { references } = sidx
   let { startIndex, endIndex } = options
+
+  if (!startIndex || !endIndex) {
+    endIndex = Math.floor(Math.random() * references.length)
+    startIndex = Math.floor(Math.random() * references.length)
+  }
+
+  endIndex = Math.min(endIndex, references.length - 1)
+  startIndex = Math.max(Math.min(startIndex, endIndex - 1), 0)
 
   let sRef = references[startIndex]
   let eRef = references[endIndex]
@@ -28,26 +38,54 @@ const getVo = (manifest, options) => {
   return videoVo;
 }
 
-const Video = function(socket, youtube) {
+const Video = function(youtube) {
 
+  const _sidxCache = {}
 
-  function saveVideo(id, index, range) {
+  const _voQueue = new BluebirdQueue({ delay: 2000, concurrency: 1 })
+  _voQueue.start()
+
+  const saveVideoPath = (id, name) => (path.join(process.cwd(),
+    process.env.VIDEO_DIR, `${id}_${name}.mp4`))
+  const convertVideoPath = (id, name) => (path.join(process.cwd(),
+   process.env.VIDEO_DIR, `${id}_${name}_convert.mp4`))
+
+  function saveVideo(id, index, range, name) {
     const merge = Buffer.concat([index, range], index.length + range.length)
-    fs.writeFileSync(`${id}_.mp4`, merge, 'binary')
-    const p1 = path.join(process.cwd(), `${id}_.mp4`)
-    return p1
+    fs.writeFileSync(saveVideoPath(id, name), merge, 'binary')
+    return saveVideoPath(id, name)
+  }
+
+  function _getSidx(obj) {
+    const { id } = obj
+    if (_sidxCache[id]) {
+      return Q.resolve(_sidxCache[id])
+    }
+    return youtube.getSidx(Object.assign({}, obj, {
+      resolution: '360p',
+      videoOnly: true
+    }))
   }
 
 
   function download(obj) {
     const { id, convert } = obj
-    return youtube.getSidx(Object.assign({}, obj, {
-        resolution: '360p',
-        videoOnly: true
-      }))
+
+    let prom = _getSidx(obj)
       .then(sidx => {
 
-        let vo = getVo(sidx, obj)
+        if (!_sidxCache[id]) {
+          _sidxCache[id] = sidx
+        }
+
+        let vo = downloadVo(sidx, obj)
+        const name = vo.byteRange
+        if (convert) {
+          const out = convertVideoPath(id, name)
+          if (fs.existsSync(out)) {
+            return Q.resolve(out)
+          }
+        }
 
         return youtube.getRange({
           url: sidx.url,
@@ -57,22 +95,22 @@ const Video = function(socket, youtube) {
           return youtube.getRange({
             url: sidx.url,
             range: vo.byteRange
+
           }).then(rangeBuffer => {
 
-            const videoPath = saveVideo(id, indexBuffer, rangeBuffer)
+            const videoPath = saveVideo(id, indexBuffer, rangeBuffer, name)
 
-            if(convert){
-              return Convert.convert(videoPath)
+            if (convert) {
+              return Convert.convert(videoPath, convertVideoPath(id, name))
             }
 
             return videoPath
-
           })
         })
       })
-      .catch(err => {
-        console.log(err);
-      })
+
+    _voQueue.add(prom)
+    return prom
   }
   return {
     download: download

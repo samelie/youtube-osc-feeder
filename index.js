@@ -9,15 +9,15 @@ const server = new Server(path.join(__dirname,'server', 'envvars'))
 
 const extractVideoId = (url)=>(url.split('v=')[1])
 
-const videoLayers = CONFIG.map(layer=>{
+const videoLayers = CONFIG.map((layer,i)=>{
 
-  return Layer(layer.map(item=>{
+  return Layer(server, layer.map(item=>{
 
     if(item.video){
       return Object.assign({}, item, {video:extractVideoId(item.video)})
     }
 
-  }))
+  }), i)
 
 })
 

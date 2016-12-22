@@ -5,9 +5,25 @@ const Q = require('bluebird');
 
 const Convert = (() => {
 
-  function convert(video) {
+
+  function getDuration(p) {
+    return new Q((yes, no) => {
+      var cmd = 'ffprobe -v quiet -of json -show_format  -i ' + p;
+      console.log(cmd);
+
+      exec(cmd,
+        (e, stdout, stderr) => {
+          if (e instanceof Error) {
+            no(e)
+          }
+          var parse = JSON.parse(stdout);
+          yes(Math.floor(parse.format.duration));
+        });
+    });
+  }
+
+  function convert(video, out) {
     const { name, dir } = path.parse(video)
-    const out = path.join(dir, `${name}_yuv.mp4`)
     const cmd = `ffmpeg -i ${video} -pix_fmt yuv420p -an -y ${out}`
     return new Q((yes, no) => {
       exec(cmd,
@@ -21,6 +37,7 @@ const Convert = (() => {
   }
 
   return {
+    getDuration: getDuration,
     convert: convert
   }
 
