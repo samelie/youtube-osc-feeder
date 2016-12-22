@@ -1,0 +1,10 @@
+.DS_Store
+dist
+build
+node_modules
+bower_components
+**.mo
+*.mp4
+
+
+source/images/
