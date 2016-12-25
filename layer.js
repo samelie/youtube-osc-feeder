@@ -1,127 +1,169 @@
 const Convert = require('./server/convert')
+const Q = require('bluebird')
+const _ = require('lodash')
+const Download = require('./download')
+
 const timeToReference = (time) => {
-  return Math.floor(time / 5)
+ return Math.floor(time / 5.12)
 }
 
-const downloadVo = (videoId, times) => {
-  if (!times) {
-    return {
-      id: videoId,
-      convert: true
-    }
-  }
-  return {
-    id: videoId,
-    startIndex: times[0],
-    endIndex: times[1],
-    convert: true
-  }
-}
 
 module.exports = function Layer(server, items, layerIndex) {
 
-  const id = `layer${layerIndex}`
+ const id = `layer${layerIndex}`
 
-  const _cache = {}
+ const FPS = 30
+ const MIN_PLAYTIME = parseInt(process.env.MIN_PLAYTIME, 10)
+ const MAX_PLAYTIME = parseInt(process.env.MAX_PLAYTIME, 10)
 
-  const { video, osc } = server
-  let activeVo
+ const _cache = {}
 
-  const parsedItems = items.map(item => {
-    const id = item.video
-    _cache[id] = _cache[id] || []
+ let results
 
-    if (!item.times) {
-      return item
-    }
-    item.references = item.times.map(time => {
-      return [timeToReference(time[0]), timeToReference(time[1])]
-    })
-    return item
-  })
+ const { video, osc } = server
+
+ let activeVo
 
 
-  function _getDuration(p) {
-    return Convert.getDuration(p)
-      .then(dur => {
-        return dur
-      })
+ function _getDuration(p) {
+  return Convert.getDuration(p)
+   .then(dur => {
+    return dur
+   })
+ }
+
+
+ function send(vo) {
+  const { path, frame } = vo
+  console.log(vo);
+  console.log(`\tSend /${id}: ${path}`);
+  osc.send(
+   `/${id}`, [`${path}`]
+  )
+
+  console.log(`\tSend ${id}frame: ${frame}`);
+  osc.send(
+   `/${id}frame`, [frame]
+  )
+ }
+
+
+ function play() {
+  next()
+ }
+
+ function next() {
+
+  const index = Math.floor(Math.random() * results.length)
+  const vo = results[index]
+  activeVo = Object.assign({}, vo)
+
+  const maxStartTime = Math.max(activeVo.duration - MIN_PLAYTIME, 0)
+  const _startTime = Math.floor(Math.random() * maxStartTime)
+  const _dur = Math.floor(Math.random() * (MAX_PLAYTIME - MIN_PLAYTIME)) + MIN_PLAYTIME
+  activeVo.duration = Math.min(_dur, MAX_PLAYTIME)
+  activeVo.frame = _startTime * FPS
+
+
+  send(activeVo)
+
+ }
+
+
+
+ let timeCounter = 0
+ setInterval(() => {
+  if (activeVo) {
+   if (timeCounter > activeVo.duration) {
+    timeCounter = 0
+    activeVo = null
+    next()
+   }
+
+   timeCounter += 0.01
   }
 
+ }, 10)
 
-  function play(vo) {
-    const {path } = vo
-    osc.send(
-      `/${id}`, [path]
-    )
+
+ const _chooseTime = (times => {
+  return times[Math.floor(Math.random() * times.length)]
+ })
+
+
+ function _downloadVideoSegment(item) {
+  const id = item.video
+  const time = _chooseTime(item.times)
+  console.log(`_downloadVideoSegment`, time);
+  console.log(timeToReference(time[0]));
+  const vo = {
+   id: id,
+   startIndex: timeToReference(time[0]),
+   endIndex: timeToReference(time[1]),
+   convert: true
   }
+  return video.download(vo)
+   .then(p => {
 
-  function download(obj) {
-    return video.download(obj)
-  }
+    return _getDuration(p)
+     .then((dur) => {
 
-
-  function _chooseTime(item) {
-    const { references } = item
-    if (!references) {
-      return null
-    }
-    const index = Math.floor(Math.random() * references.length)
-    return references[index]
-  }
-
-  function next() {
-
-    const index = Math.floor(Math.random() * parsedItems.length)
-    const item = parsedItems[index]
-
-    const id = item.video
-
-    const vo = downloadVo(id, _chooseTime(item))
-    download(vo)
-      .then(p => {
-
-        return _getDuration(p)
-          .then((dur) => {
-
-            const vo = {
-              path: p,
-              duration: dur * 1000,
-            }
-
-            _cache[id].push(vo)
-
-            activeVo = Object.assign({}, vo)
-
-            console.log(activeVo);
-
-            return play(vo)
-          })
-      })
-      .finally()
-  }
-
-  let timeCounter = 0
-  setInterval(()=>{
-
-    if(activeVo){
-      if(timeCounter > activeVo.duration){
-        timeCounter = 0
-        activeVo = null
-        next()
+      const vo = {
+       path: p,
+       duration: dur,
       }
 
-      timeCounter+=10
-      console.log(timeCounter);
+      return vo
+     })
+   })
+ }
+
+
+ function download(options = {}) {
+  return Q.map(items, item => {
+    if (item.playlist) {
+
+     return Download.playlist(item.playlist)
+      .then(paths => {
+       console.log(paths);
+       return Q.map(paths, ppath => {
+        return _getDuration(ppath)
+         .then(dur => {
+          return {
+           path: ppath,
+           duration: dur,
+          }
+         })
+       })
+      }, { concurrency: 1 })
+
+    } else {
+     if (item.times) {
+      return _downloadVideoSegment(item)
+     } else {
+      return Download.video(item.video)
+       .then(videoPath => {
+        return _getDuration(videoPath)
+         .then((dur) => {
+          return {
+           path: videoPath,
+           duration: dur,
+          }
+         })
+       })
+     }
     }
+   }, { concurrency: 1 })
+   .then(r => {
+    results = _.flattenDeep(r)
+    return results
+   })
+ }
 
-  },10)
-
-  next()
-
-
-
-  return {
-
-  }
+ return {
+  download: download,
+  play: play,
+  results: results,
+  items: items
+ }
 }

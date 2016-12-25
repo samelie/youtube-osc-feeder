@@ -8,9 +8,7 @@ const Convert = (() => {
 
   function getDuration(p) {
     return new Q((yes, no) => {
-      var cmd = 'ffprobe -v quiet -of json -show_format  -i ' + p;
-      console.log(cmd);
-
+      var cmd = `ffprobe -v quiet -of json -show_format  -i ` + p;
       exec(cmd,
         (e, stdout, stderr) => {
           if (e instanceof Error) {
@@ -22,9 +20,9 @@ const Convert = (() => {
     });
   }
 
-  function convert(video, out) {
+  function convert(video, out, dur) {
     const { name, dir } = path.parse(video)
-    const cmd = `ffmpeg -i ${video} -pix_fmt yuv420p -an -y ${out}`
+    const cmd = `ffmpeg -i ${video} -pix_fmt yuv420p -an -y -t ${dur} ${out}`
     return new Q((yes, no) => {
       exec(cmd,
         (e, stdout, stderr) => {

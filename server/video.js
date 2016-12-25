@@ -1,5 +1,6 @@
 const path = require('path')
 const fs = require('fs')
+const readDir = require('readdir');
 
 const Q = require('bluebird')
 const BluebirdQueue = require('./bluebirdQueue')
@@ -71,6 +72,10 @@ const Video = function(youtube) {
   function download(obj) {
     const { id, convert } = obj
 
+
+    console.log(obj);
+
+
     let prom = _getSidx(obj)
       .then(sidx => {
 
@@ -80,9 +85,12 @@ const Video = function(youtube) {
 
         let vo = downloadVo(sidx, obj)
         const name = vo.byteRange
+        const out = convertVideoPath(id, name)
+          console.log(out);
+          console.log(fs.existsSync(out));
         if (convert) {
-          const out = convertVideoPath(id, name)
           if (fs.existsSync(out)) {
+            console.log("\tExists!");
             return Q.resolve(out)
           }
         }
@@ -101,7 +109,7 @@ const Video = function(youtube) {
             const videoPath = saveVideo(id, indexBuffer, rangeBuffer, name)
 
             if (convert) {
-              return Convert.convert(videoPath, convertVideoPath(id, name))
+              return Convert.convert(videoPath, convertVideoPath(id, name), vo.duration)
             }
 
             return videoPath
