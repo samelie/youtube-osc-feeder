@@ -23,7 +23,7 @@ const Download = (() => {
         }
       }
 
-      var cmd = `./binaries/youtube-dl ${p} --yes-playlist -f 18/worstvideo -o '${saveDir}/%(id)s.%(ext)s'`
+      var cmd = `./binaries/youtube-dl ${p} --no-warnings  --yes-playlist -f 18/worstvideo -o '${saveDir}/%(id)s.%(ext)s'`
       console.log(cmd);
       exec(cmd,
         (e, stdout, stderr) => {
@@ -50,7 +50,7 @@ const Download = (() => {
         }
       }
 
-      var cmd = `./binaries/youtube-dl https://www.youtube.com/watch?v=${videoId} -f 18/worstvideo -o '${saveDir}/%(id)s.%(ext)s'`
+      var cmd = `./binaries/youtube-dl https://www.youtube.com/watch?v=${videoId} -f 18/worstvideo --no-warnings   -o '${saveDir}/%(id)s.%(ext)s'`
       console.log(cmd);
       exec(cmd,
         (e, stdout, stderr) => {

@@ -1,8 +1,15 @@
-##Osc video feeder of youtube videos and playlists.
+#Osc video feeder of youtube videos and playlists.
 
 Give it urls to download then randomly send videos over osc within min and max time limits.
 
 It also send a frame to skip to. All youtube videos are 30fps.
+
+##Run
+
+`npm start`
+
+
+##Configure
 
 
 The video path on the harddive is sent over OSC with port `TARGET_OSC_PORT` at this route:
@@ -61,6 +68,7 @@ Example config.json with comments
 ```
 
 All Options.
+
 ```
 PORT=3456
 BINARIES=./binaries/
@@ -92,3 +100,7 @@ Needs ffmpeg installed. Brew is easiest.
 
 
 #Roadmap
+
+ - Better way to add videos
+
+ - live watching for uploads

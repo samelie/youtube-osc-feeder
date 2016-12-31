@@ -10,7 +10,7 @@ const VIDEO_ID = 'ufXJDkgaCEk'
 //const SIDX = require('@samelie/node-youtube-dash-sidx');
 const Server = require('./server')
 
-const server = new Server(path.join(__dirname, 'envvars'))
+const server = new Server(path.join(process.env(), 'envvars'))
 /*
 
 function saveVideo(id, index, range) {
