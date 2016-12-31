@@ -1,10 +1,14 @@
 #Osc video feeder of youtube videos and playlists.
 
+![IMAGE ALT TEXT](http://img.youtube.com/vi/b2Y7h0FmCGM/0.jpg)](http://www.youtube.com/watch?v=b2Y7h0FmCGM "Ain't me babe")
+
 Give it urls to download then randomly send videos over osc within min and max time limits.
 
 It also send a frame to skip to. All youtube videos are 30fps.
 
 ##Run
+
+(requires node 7.0++)
 
 `npm start`
 
